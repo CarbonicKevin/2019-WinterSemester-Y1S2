@@ -1,15 +1,17 @@
 from chessPlayer_lib import *
-from chess_board_lib import *
+from random import choice
 
-board = boardInit()
-printBoard(board)
-root = treeNode(board)
-root.genTree(10, 4)
-print(root.childList)
+def chessPlayer(board, player):
+	oCanList = []
+	root = treeNode(board)
+	noError = root.genCandidate(player, 3)
 
-'''
-root.genTree(20, 4)  # White goes first
-print(len(root.childList))
-print(root.childList)
-'''
-#print(root.getmmValue(0))
+	for child in root.candidate:
+		oCanList += [[child.move, child.worth]]
+
+	childMove = choice(root.candidate)
+	move = [childMove.move, childMove.worth]
+
+	tree = root.getLevelOrder()
+
+	return([noError, move, oCanList, tree])

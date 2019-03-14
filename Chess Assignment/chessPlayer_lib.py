@@ -1,3 +1,4 @@
+from chess_board_lib import *
 class treeNode:
 	def __init__(self, board):
 		"""
@@ -5,11 +6,17 @@ class treeNode:
 		|	Arguments	   : board    | Data struct
 		|	Class Variables: board    | Datastruct
 		|				   : worth    | int value
+		|				   : move 	  | list in the form [pos, move] or None
+		|				   : mmValue  | 
 		|				   : treeList | list of treeNode class objects
 		"""
 		self.board = list(board)
 		self.worth = self.worthCalc()
 		self.childList = []
+
+		self.move = []
+		self.candidate = []
+		self.mmValue = None
 
 	def worthCalc(self):
 		"""
@@ -17,76 +24,88 @@ class treeNode:
 		|	Arguments: None
 		|	Returns  : Numeric sum of the 'worth' of piece on the board
 		"""
-		worthList = [1, 3, 3, 5, 9, 10000]  # Based on 'Reinfeld Values'
+		worthList = [100, 320, 330, 500, 900, 20000]  # Based on 'Reinfeld Values'
+		#worthList = [5, 30, 30, 50, 90, 100000]
 		worth = 0
-		for piece in self.board:  # For every piece
+
+		for pos, piece in enumerate(self.board):  # For every piece
 			if piece == 0: continue  # If null piece, ignore
 			pieceType = piece%10  # Finding piece type
 			colour = piece - pieceType  # finding the colour
-			if colour == 10: colour = 1  # if it should be plus or minus
-			else: colour = -1  
-			worth += colour*worthList[pieceType]  # Add the worth
+			if colour == 10: mult = 1  # if it should be plus or minus
+			else: mult = -1  
+			worth += mult*(worthList[pieceType] + self.evalPosMatrix(pos, pieceType, colour))  # Add the worth
+
 		return(worth)
-	
-	def genTree(self, player, depth, alpha=-99999999, beta=99999999):
-		"""
-		|	Generates a tree based on the current board, w/ depth limit
-		|	Arguments: depth | the depth limit, current node is depth 0
-		|	Arguments: player| the next turn of the tree
-		|	Returns  : True or success
-		"""
-		self.childList = []  # Clearing any pre existing values
-		if depth <= 0:  # exit case, if depth is 0 or less than 0
-			return(self.worth)  # Return the value of the final node
 
-		# Defining variables
-		playerList = [20, 10]
-		modeList = [max, min]
-		maxEvalList = [-99999999, 99999999]
-		totalPosList = []
+	def evalPosMatrix(self, pos, piece, colour):
+		listIndex = int(colour/10)-1
+		paMatrixBlack = [0,  0,  0,  0,  0,  0,  0,  0,
+						 50, 50, 50, 50, 50, 50, 50, 50,
+						 10, 10, 20, 30, 30, 20, 10, 10,
+ 						 5,  5, 10, 25, 25, 10,  5,  5,
+ 						 0,  0,  0, 20, 20,  0,  0,  0,
+ 						 5, -5,-10,  0,  0,-10, -5,  5,
+						 5, 10, 10,-20,-20, 10, 10,  5,
+ 						 0,  0,  0,  0,  0,  0,  0,  0]
+		paMatrixWhite = list(paMatrixBlack[::-1])
 
-		nextPlayer = playerList[int(player/10)-1]  # If white, next player is black
-		mode = modeList[int(player/10)-1]  # Goal of white is to max black is to min
-		maxEval  = maxEvalList[int(player/10)-1]  # Defining a value that will always be smaller for white, and larger for black 
+		knMatrixBlack = [-50,-40,-30,-30,-30,-30,-40,-50,
+						 -40,-20,  0,  0,  0,  0,-20,-40,
+						 -30,  0, 10, 15, 15, 10,  0,-30,
+						 -30,  5, 15, 20, 20, 15,  5,-30,
+						 -30,  0, 15, 20, 20, 15,  0,-30,
+						 -30,  5, 10, 15, 15, 10,  5,-30,
+						 -40,-20,  0,  5,  5,  0,-20,-40,
+						 -50,-40,-30,-30,-30,-30,-40,-50]
+		knMatrixWhite = list(knMatrixBlack[::-1])
 
-		playerPos = GetPlayerPositions(self.board, player)
-		for pos in playerPos:
-			moves = GetPieceLegalMoves(self.board, pos)
-			for move in moves:
-				totalPosList += [[pos, move]]
-				
-		for move in totalPosList:
-			copyBoard = altBoard(self.board, move[0], move[1])
-			copyNode = treeNode(copyBoard)
-			self.childList += [copyNode]
-			mmValue = copyNode.genTree(nextPlayer, depth-1, alpha, beta)
+		biMatrixBlack = [-20,-10,-10,-10,-10,-10,-10,-20,
+						 -10,  0,  0,  0,  0,  0,  0,-10,
+						 -10,  0,  5, 10, 10,  5,  0,-10,
+						 -10,  5,  5, 10, 10,  5,  5,-10,
+						 -10,  0, 10, 10, 10, 10,  0,-10,
+						 -10, 10, 10, 10, 10, 10, 10,-10,
+						 -10,  5,  0,  0,  0,  0,  5,-10,
+						 -20,-10,-10,-10,-10,-10,-10,-20]
+		biMatrixWhite = list(biMatrixBlack[::-1])
 
-			maxEval = mode(maxEval, mmValue)
-			if player == 10: alpha = mode(alpha, mmValue)
-			else: beta = min(alpha, mmValue)
+		roMatrixBlack = [ 0,  0,  0,  0,  0,  0,  0,  0,
+						  5, 10, 10, 10, 10, 10, 10,  5,
+						 -5,  0,  0,  0,  0,  0,  0, -5,
+						 -5,  0,  0,  0,  0,  0,  0, -5,
+						 -5,  0,  0,  0,  0,  0,  0, -5,
+						 -5,  0,  0,  0,  0,  0,  0, -5,
+						 -5,  0,  0,  0,  0,  0,  0, -5,
+						  0,  0,  0,  5,  5,  0,  0,  0]
+		roMatrixWhite = list(roMatrixBlack[::-1])
 
-			if beta<=alpha:
-				break
-		return(maxEval)
+		quMatrixBlack = [-20,-10,-10, -5, -5,-10,-10,-20,
+						 -10,  0,  0,  0,  0,  0,  0,-10,
+						 -10,  0,  5,  5,  5,  5,  0,-10,
+						  -5,  0,  5,  5,  5,  5,  0, -5,
+						   0,  0,  5,  5,  5,  5,  0, -5,
+						 -10,  5,  5,  5,  5,  5,  0,-10,
+						 -10,  0,  5,  0,  0,  0,  0,-10,
+						 -20,-10,-10, -5, -5,-10,-10,-20]
+		quMatrixWhite = list(quMatrixBlack[::-1])
+
+		kiMatrixBlack = [-30,-40,-40,-50,-50,-40,-40,-30,
+						 -30,-40,-40,-50,-50,-40,-40,-30,
+						 -30,-40,-40,-50,-50,-40,-40,-30,
+						 -30,-40,-40,-50,-50,-40,-40,-30,
+						 -20,-30,-30,-40,-40,-30,-30,-20,
+						 -10,-20,-20,-20,-20,-20,-20,-10,
+						  20, 20,  0,  0,  0,  0, 20, 20,
+						  20, 30, 10,  0,  0, 10, 30, 20]
+		kiMatrixWhite = list(kiMatrixBlack[::-1])
 
 
-	def genChildren(self, player):
-		"""
-		|	Generates Children of Current Board, saves it to self.worthList
-		|	Arguments: player | numeric value. 10: white, 20: black
-		|	Returns  : True or success
-		"""
+		matrixList = [[paMatrixWhite, paMatrixBlack], [knMatrixWhite, knMatrixBlack],
+					  [biMatrixWhite, biMatrixWhite], [roMatrixWhite, roMatrixBlack],
+					  [quMatrixWhite, quMatrixBlack], [kiMatrixWhite, kiMatrixBlack]]
+		return(matrixList[piece][listIndex][pos])
 
-		'''
-		self.childList = []  # Initialising childList to be a non-null value
-		playerPositions = GetPlayerPositions(self.board, player)  # Getting all player positions
-		for pos in playerPositions:
-			moves = GetPieceLegalMoves(self.board, pos)  # Generating moves for given piece
-			for move in moves:
-				copyBoard =	altBoard(self.board, pos, move)
-				self.childList += [treeNode(copyBoard)]
-		return(True)
-		'''
 	def returnByDepth(self):
 		"""
 		|	Is recursively run, returns a tree in list format and the mmValue 
@@ -95,35 +114,137 @@ class treeNode:
 		"""
 		output = [self.worth, self.board, []]
 		for obj in self.childList:
-			output[2] +=  obj.returnByDepth()
+			output[2] +=  [obj.returnByDepth()]
 		return(output)
 
-def genPreCalc(root, player, depth):
-	file = open('chessPlayer_Precalc.py', 'w+')
-	root.genTree(player, depth)
-	file.write('root='+str(root.returnByDepth()))
+	def genTree(self, player, depth):
+		"""
+		|	Generates a tree based on the current board, w/ depth limit
+		|	Arguments: depth | the depth limit, current node is depth 0
+		|	Arguments: player| the next turn of the tree
+		|	Returns  : True or success
+		"""
+		self.childList = []  # Clearing previous entries
+		if depth == 0 or incheck(self.board, player):  # Exit case
+			return()
 
-	'''
-	def getmmValue(self, mode):
-		"""
-		|	Gets the min max value of each node, returns a list of nodes with highest mmValue
-		|	Arguments: node | an object of class treeNode
-		|			 : mode | 0 for max, 1 for min
-		|	Returns  : A list of objects of treeNode
-		"""
-		"""
+		# Defining Conditional Variables
+		listIndex = int(player/10)-1
+		playerList = [20, 10]
 		modeList = [max, min]
-		modeFunc = modeList[mode]
-		nextModeList = [1, 0]
-		nextMode = nextModeList[mode]
-		worthList = []
-		if self.childList == []:
-			return(self.worth)
-		for childNode in self.childList:
-			worthList += [childNode.getmmValue(nextMode)]
-		return(modeFunc(worthList))
+		maxEvalList = [-99999999999999999999999, 99999999999999999999999]
+		
+		nextPlayer = playerList[listIndex]  # If white, next player is black
+		mode = modeList[listIndex]  # Goal of white is to max black is to min
+		maxEval  = maxEvalList[listIndex]  # Defining a value that will always be smaller for white, and larger for black
+		
+		# Recursivly calling genTree
+		for pos in GetPlayerPositions(self.board, player):
+			for move in GetRawPieceLegalMoves(self.board, player):
+				child = treeNode(altBoard(self.board, pos, move))
+				child.move = [pos, move]
+				mmValue = child.genTree(nextPlayer, depth-1)
+				self.childList += [child]
+
+				maxEval = mode(maxEval, mmValue)  # AB pruning step
+
+		self.mmValue = maxEval
+		return(maxEval)
+
+	def genTreeAB(self, player, depth, alpha=-99999999, beta=99999999):
 		"""
-	'''
+		|	Generates a tree based on the current board, w/ depth limit and alpha beta pruning
+		|	Arguments: depth | the depth limit, current node is depth 0
+		|			   player| the next turn of the tree
+		|			   alpha | value to evaulate ab
+		|			   beta  | value to evaulate beta
+		|	Returns  : True or success
+		"""
+		self.childList = []  # Clearing any pre existing values
+		totalPosList = []
+		if depth == 0 or incheck(self.board, player):  # exit case, if depth is 0 or less than 0
+			return(self.worth)  # Return the value of the final node
+
+		# Defining Conditional Variables
+		listIndex = int(player/10)-1
+		playerList = [20, 10]
+		modeList = [max, min]
+		maxEvalList = [-99999999, 99999999]
+		endRow = [7, 0]
+
+		nextPlayer = playerList[listIndex]  # If white, next player is black
+		mode = modeList[listIndex]  # Goal of white is to max black is to min
+		maxEval  = maxEvalList[listIndex]  # Defining a value that will always be smaller for white, and larger for black		
+		
+		# Generating a list of player positions
+		for pos in GetPlayerPositions(self.board, player):
+			for move in RawGetPieceLegalMoves(self.board, pos):
+				totalPosList += [[pos, move]]
+
+		# Recursivly calling genTreeAB using AB pruning
+		for move in totalPosList:
+			
+			tile = self.board[move[0]]
+			pieceType = tile%10
+			colour = tile-pieceType
+			row = int((move[1]-(move[1]%8))/8)
+
+			end = endRow[int(colour/10)-1]
+			if tile == colour and row == end:
+				quBoard = list(self.board)
+				quBoard[move[0]] = player+4
+				childNode = treeNode(altBoard(quBoard, move[0], move[1]))
+			else:
+
+				childNode = treeNode(altBoard(self.board, move[0], move[1]))  # Recursive step
+			
+			childNode.move = move
+			mmValue = childNode.genTreeAB(nextPlayer, depth-1, alpha, beta)
+			self.childList += [childNode]
+			#print(self.childList, nextPlayer)
+
+			maxEval = mode(maxEval, mmValue)  # AB pruning step
+			if player == 10: alpha = mode(alpha, mmValue)
+			else: beta = mode(beta, mmValue)
+
+			if beta<=alpha:
+				break
+		self.mmValue = maxEval
+		return(maxEval)
+
+	def genCandidate(self, player, depth, AB=1):
+		"""
+		|	Returns a list of candidate nodes using the minMax algorithm
+		|	Arguments: player
+		|	Retrurns : A list of treeNode 
+		"""
+		candidateMoves = []
+		try:
+			if AB == 1: self.genTreeAB(player, depth)
+			else: self.genTree(player, depth)
+		except:	
+			return(False)
+		else:
+			for child in self.childList:
+				if child.mmValue == self.mmValue:
+					candidateMoves += [child]
+			self.candidate = candidateMoves
+
+			return(True)
+
+	def getLevelOrder(self):
+		output = []
+		queue = []
+		queue += [[True, [self.move, self.worth, self.childList]]]
+		while (len(queue) > 0):
+			if queue[0][0] != False:
+				output += [[queue[0][1][0], queue[0][1][1]]]
+				childList = queue[0][1][2]
+				queue = queue[1:]
+				for child in childList:
+					queue += [[True, [child.move, child.worth, child.childList]]]
+		return(output)
+
 def GetPlayerPositions(board, player):
 	"""
 	|	Gives a list of player positions
@@ -133,16 +254,20 @@ def GetPlayerPositions(board, player):
 	"""
 	# Defining Variables
 	numCol, numRow = 8, 8
-	posList = []
+	pawnList, knList, biList, roList, quList, kiList = [], [], [], [], [], []
+	pieceTypeList = [pawnList, knList, biList,
+					roList, quList, kiList]
 
 	for i in range(0, numCol*numRow):
-		# Finding out if it is Black or White
+		# Finding out if it is Black or White, and what piece
 		tile = board[i]
+		pieceType = tile%10
 		cPlayer = tile-(tile%10)
 
 		# Adding the position
 		if cPlayer == player:
-			posList += [i]
+			pieceTypeList[pieceType] += [i]
+	posList = pawnList + knList + biList + roList + quList + kiList  # Adding the valid moves in order of piece worth
 	return(posList)
 
 def GetPieceLegalMoves(board, position):
@@ -459,24 +584,131 @@ def altBoard(board, pos, move):
 	copyBoard[pos] = 0
 	return(copyBoard)
 
+def incheck(board, player):
+	kingPos = pieceFind(board, player+5)
+	if IsPositionUnderThreat(board, kingPos, player) and len(GetPieceLegalMoves(board, kingPos)) == 0:
+		return(True)
+	return(False)
 '''
-def getmmValue(node, mode):
-	"""
-	|	Gets the min max value of each node, returns a list of nodes with highest mmValue
-	|	Arguments: node | an object of class treeNode
-	|			 : mode | 0 for max, 1 for min
-	|	Returns  : A list of objects of treeNode
-	"""
-	modeList = [max, min]
-	modeFunc = modeList[mode]
-	nextModeList = [1, 0]
-	nextMode = nextModeList[mode]
-	worthList = []
+	def candidateMoves(self, player, depth, AB=1):
+		"""
+		|	Returns a list of candidate nodes using the minMax algorithm
+		|	Arguments: player
+		|	Retrurns : A list of treeNode 
+		"""
+		candidateMoves = []
+		if AB == 1: self.genTreeAB(player, depth)
+		else: self.genTree(player, depth)
+		for child in self.childList:
+			if child.mmValue == self.mmValue:
+				candidateMoves += [child]
+		self.noOfMovesRating(player, candidateMoves)
+		candidateMoves = self.pawnAnalysis(player, candidateMoves)
+		return(candidateMoves)
 
-	if node.childList == []:
-		print(node.worth)
-		return(node.worth)
-	for childNode in node.childList:
-		worthList += [getmmValue(childNode, nextMode)]
-	return(modeFunc(worthList))
-'''
+	def noOfMovesRating(self, player, candidateMoves):
+		for candiate in candidateMoves:
+			count = 0
+			board = candiate.board
+			for pos in GetPlayerPositions(board, player):
+				for move in GetPieceLegalMoves(board, pos):
+					if board[pos] != player + 5:
+						count += 1
+					else:
+						count -= 1
+			candiate.rating += count
+
+
+	def pawnAnalysis(self, player, canMoves):
+		"""
+		|	Returns a list of reduced candiate nodes based on some analysis of pawn structures
+		|	Refernces Structures from article: https://thechessworld.com/articles/endgame/7-basic-pawn-structure-you-must-know/
+		|	Arguments: player
+		|	Retrurns : A list of treeNode 
+		"""
+
+		ratingList = []
+		candidateMoves = []
+		pawnList = [pos for pos in GetPlayerPositions(self.board, player) if self.board[pos] == player]
+		for child in canMoves:
+			r = max(child.passedDown(player, pawnList), child.isolatedPawn(player, pawnList),
+				     child.connectedPawn(player, pawnList), child.doubledPawns(player, pawnList))
+			self.rating += r
+			ratingList += [self.rating]
+		maxRating = max(ratingList)
+		for i, rating in enumerate(ratingList):
+			if rating == maxRating:
+				candidateMoves += [canMoves[i]]
+		return(candidateMoves)
+	
+	def passedDown(self, player, pawnList):  # Max rating of 2, min of 0
+		numCol, numRow = 8, 8
+		index = int(player/10)-1
+		endRowList = [7, 0]
+		endRow =  endRowList[index]
+
+		for pawn in pawnList:
+			col = pawn%numCol
+			row = int((pawn-col)/numCol)
+			rating = abs(row-endRow)
+			if rating <= 1: return(5)
+			if rating == 2: return(2)
+			else: return(0)
+
+	def isolatedPawn(self, player, pawnList):  # Max rating of 0, min of -2
+		numCol, numRow = 8, 8
+		rating = 0
+		
+		for pawn in pawnList:
+			col = pawn%numCol
+			row = int((pawn-col)/numCol)
+			upRow, downRow = row+1, row-1
+			rightCol, leftCol = col+1, col-1
+
+			for surrRow in [upRow, downRow]:
+				if surrRow in range(0, numRow):
+					for surrCol in [rightCol, leftCol]:
+						if surrCol in range(0, numCol):
+							tilePos = surrRow*numCol + surrCol
+							tile = self.board[tilePos]
+							if tile == 0:
+								rating -= (1/4)
+		if rating <= -2:
+			return(-2)
+		return(rating)
+	def connectedPawn(self, player, pawnList):  # Max rating of 2, min of 0
+		numCol, numRow = 8, 8
+		rating = 0
+		
+		for pawn in pawnList:
+			col = pawn%numCol
+			row = int((pawn-col)/numCol)
+			rightCol, leftCol = col+1, col-1
+
+			for surrCol in [rightCol, leftCol]:
+				if surrCol in range(0, numCol):
+					tilePos = row*numCol + surrCol
+					tile = self.board[tilePos]
+					if tile == player:
+						rating += 1
+		if rating >= 2:
+			return(2)
+		return(rating)
+
+	def doubledPawns(self, player, pawnList):  # Max rating of 0, min of -2
+		numCol, numRow = 8, 8
+		rating = 0
+		
+		for pawn in pawnList:
+			col = pawn%numCol
+			row = int((pawn-col)/numCol)
+			upRow, downRow = row+1, row-1
+
+			for surrRow in [upRow, downRow]:
+				if surrRow in range(0, numRow):
+					tilePos = surrRow*numCol + col
+					tile = self.board[tilePos]
+					if tile == 0:
+						rating -= 1
+		return(rating)
+	'''
